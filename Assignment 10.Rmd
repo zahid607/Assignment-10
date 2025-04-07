@@ -1,0 +1,365 @@
+---
+title: "Assignment 10"
+author: "Mohammad Zahid Chowdhury"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Required package and librires:
+
+```{r}
+library(tidyverse)
+library(tidytext)
+library(janeaustenr)
+library(wordcloud)
+library(gutenbergr)
+library(dplyr)
+library(tidyr)
+```
+
+# AFINN Sentiment:
+
+
+```{r}
+get_sentiments("afinn")
+
+```
+
+
+
+```{r}
+get_sentiments("bing")
+
+```
+
+# Download the books from gutenberg package:
+
+```{r}
+gutenberg_metadata
+
+```
+
+# From the list of books I have selected The United States Constitution book. 
+
+```{r}
+constitution_data1 <- gutenberg_works(title == "The United States Constitution") %>%
+  gutenberg_download(meta_fields = "title")
+
+# Add a column called chapters based on the I,II, III in the book
+constitution_data2<- constitution_data1 %>%
+  mutate( linenumber = row_number(),
+    chapter = cumsum(str_detect(text, regex("^([\\divxlc])+$", ignore_case = TRUE)))) %>%
+  ungroup() %>%
+  unnest_tokens(word, text)
+
+constitution_data3 <- constitution_data2 %>% 
+  inner_join(get_sentiments("afinn")) %>% 
+  group_by(index = linenumber %/% 80) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  mutate(method = "AFINN")
+
+constitution_data3
+
+```
+
+# chart negative and positive sentiment:
+
+```{r}
+
+constitution_data3 %>%
+ggplot(aes(index, sentiment, fill = method)) +
+  geom_col(show.legend = FALSE)
+
+```
+
+# count the words in the book
+
+```{r}
+count_constitution <- constitution_data2 %>%
+  group_by(chapter) %>%
+  count(word, sort = TRUE)
+count_constitution
+
+```
+
+# Remove stop words
+
+```{r}
+remove_constitution <- constitution_data2 %>%
+  anti_join(stop_words)
+remove_constitution
+
+```
+
+
+# Count the words in the book after removing stop words
+
+```{r}
+
+remove_constitution %>%
+  count(word, sort = TRUE)
+
+```
+
+
+# Download the books from gutenberg package:
+
+```{r}
+gutenberg_metadata
+
+```
+
+# From the list of books I have selected The United States Constitution book for sentiment analysis.
+
+```{r}
+
+constitution_data4 <- gutenberg_works(title == "The United States Constitution") %>%
+  gutenberg_download(meta_fields = "title")
+
+
+# Add a column called chapters based on the I,II, III in the book
+constitution_data5<- constitution_data4 %>%
+  mutate( linenumber = row_number(),
+    chapter = cumsum(str_detect(text, regex("^([\\divxlc])+$", ignore_case = TRUE)))) %>%
+  ungroup() %>%
+  unnest_tokens(word, text)
+
+constitution_data6<- constitution_data5 %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(title, index = linenumber %/% 100, sentiment) %>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>% 
+  mutate(sentiment = positive - negative)
+
+constitution_data6
+
+```
+
+# Bar diagram for negative and positive sentiment
+
+```{r}
+
+ggplot(constitution_data6, aes(index, sentiment, fill = title)) +
+  geom_col(show.legend = FALSE)
+
+```
+
+# count the words in the book
+
+```{r}
+
+count_constitution <- constitution_data5 %>%
+  group_by(chapter) %>%
+  count(word, sort = TRUE)
+count_constitution
+
+
+```
+
+# Remove stop words
+
+```{r}
+remove_constitution <- constitution_data5 %>%
+  anti_join(stop_words)
+remove_constitution
+
+```
+
+# Count the words in the book after removing stop words
+
+
+```{r}
+remove_constitution %>%
+  count(word, sort = TRUE)
+
+```
+
+# Get Positive and negative sentiment
+
+```{r}
+
+constitution_data7 <- remove_constitution %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  ungroup()
+
+constitution_data7
+
+```
+
+# Bar diagram for both negative and positive sentiment
+
+
+```{r}
+constitution_data7 %>%
+  group_by(sentiment) %>%
+slice_max(n, n = 10) %>% 
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(n, word, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(x = "Contribution to sentiment",
+       y = NULL)
+
+```
+
+# Wordcloud postive words
+
+```{r}
+pos <- constitution_data7 %>%
+  filter(sentiment == "positive")
+
+wordcloud(
+  words = pos$word,
+  freq = pos$n,
+  max.words = 100,
+  colors = "blue")
+
+
+```
+
+# Wordcloud negative words
+
+```{r}
+neg <- constitution_data7 %>%
+  filter(sentiment == "negative")
+
+# Wordcloud Negative words
+wordcloud(
+  words = neg$word,
+  freq = neg$n,
+  max.words = 30,
+  colors = "blue")
+
+
+```
+
+# Download the text of The United States Constitution
+
+# Perform sentiment analysis with AFINN and Bing lexicons
+
+```{r}
+The_United_States_Constitution <- gutenberg_works(title == "The United States Constitution") %>%
+  gutenberg_download(meta_fields = "title")
+
+# Add a linenumber column to keep track of the line numbers
+The_United_States_Constitution <- The_United_States_Constitution %>%
+  mutate(linenumber = row_number())
+
+# Tokenize the text into words
+The_United_States_Constitution_tokens <- The_United_States_Constitution %>%
+  unnest_tokens(word, text)
+
+# Perform sentiment analysis with AFINN and Bing lexicons
+afinn_and_bing <- bind_rows(
+  # AFINN method
+  The_United_States_Constitution_tokens %>%
+    inner_join(get_sentiments("afinn")) %>%
+    mutate(method = "afinn"),
+  
+  # Bing method
+  The_United_States_Constitution_tokens %>%
+    inner_join(get_sentiments("bing") %>% 
+                 filter(sentiment %in% c("positive", "negative"))) %>%
+    mutate(method = "bing")
+) %>%
+  # Group by method, index (80-line chunks), and sentiment
+  count(method, index = linenumber %/% 80, sentiment) %>%  # Count the occurrences of sentiments
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = list(n = 0)) %>%  # Pivoting data
+  mutate(sentiment = positive - negative)  # Calculate sentiment (positive - negative)
+
+# View the result
+afinn_and_bing
+
+
+```
+
+
+
+```{r}
+bind_rows(afinn_and_bing) %>%
+  ggplot(aes(index, sentiment, fill = method)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~method, ncol = 1, scales = "free_y")
+
+
+```
+
+
+# Loughran sentiment
+
+```{r}
+
+loughran_lexicon <- get_sentiments("loughran")
+
+```
+
+
+# Download the book from gutenberg
+
+```{r}
+gutenberg_metadata
+
+```
+
+
+
+
+```{r}
+constitution_lou <- gutenberg_works(title == "The United States Constitution") %>%
+  gutenberg_download(meta_fields = "title")
+
+
+# Add a column called chapters based on the I,II, III in the book
+constitution_lou2<- constitution_lou %>%
+  mutate( linenumber = row_number(),
+    chapter = cumsum(str_detect(text, regex("^([\\divxlc])+$", ignore_case = TRUE)))) %>%
+  ungroup() %>%
+  unnest_tokens(word, text)
+
+# table with sentiments
+constitution_lou3 <- constitution_lou2 %>%
+  inner_join(get_sentiments("loughran")) %>%
+  count(title, index = linenumber %/% 100, sentiment) %>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>% 
+  mutate(sentiment = positive - negative)
+
+constitution_lou3
+
+```
+
+# Bar diagram of negative and positive sentiment for Loughran sentiment:
+
+```{r}
+ggplot(constitution_lou3, aes(index, sentiment, fill = title)) +
+  geom_col(show.legend = FALSE)
+
+```
+
+# Custom lexicon words
+
+```{r}
+
+custom_lexicon <- loughran_lexicon %>%
+  bind_rows(tribble(~word, ~sentiment,
+                    "black", "negative",
+                    "eyes", "positive"))
+
+# look at new sentiment with customer lexicon
+custom_words <- constitution_lou2 %>%
+  inner_join(custom_lexicon) %>%
+  count(word, sentiment, sort = TRUE)
+
+custom_words
+
+```
+
+# Conclusion: Sentiment analysis is a technique used to understand the emotions and opinions expressed in texts.Sentiment analysis performs by organizing text data in a tidy structure, making it easier to apply methods like inner joins. With sentiment analysis, we can track how emotions evolve within a story or identify key words that express emotions and opinions. The chapter sets the stage for future case studies where different methods of sentiment analysis will be applied to various types of texts.
+
